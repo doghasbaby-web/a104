@@ -1,13 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import db, { generateId } from '../db/database';
 import type { ExecuteFlowRequest, ExecuteFlowResponse } from '../../../shared/types/index.js';
 import { BlockFlowExecutor } from '../services/blockFlowExecutor.js';
 import { CodeGenerator } from '../services/codeGenerator.js';
 import { logger } from '../utils/logger.js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export class ExecutionController {
   private executor: BlockFlowExecutor;
@@ -26,16 +21,17 @@ export class ExecutionController {
 
     try {
       // Get diagram
-      const { data: diagram, error: diagramError } = await supabase
-        .from('diagrams')
-        .select('*')
-        .eq('id', request.diagramId)
-        .eq('user_id', userId)
-        .single();
+      const diagram = db
+        .prepare('SELECT * FROM diagrams WHERE id = ? AND user_id = ?')
+        .get(request.diagramId, userId) as any;
 
-      if (diagramError || !diagram) {
+      if (!diagram) {
         throw new Error('Diagram not found');
       }
+
+      const blocks = JSON.parse(diagram.blocks || '[]');
+      const connections = JSON.parse(diagram.connections || '[]');
+      const config = diagram.config ? JSON.parse(diagram.config) : null;
 
       // Generate code
       const generatedCode = this.codeGenerator.generateFromDiagram({
@@ -43,17 +39,17 @@ export class ExecutionController {
         name: diagram.name,
         description: diagram.description,
         userId: diagram.user_id,
-        blocks: diagram.blocks || [],
-        connections: diagram.connections || [],
-        config: diagram.config,
+        blocks,
+        connections,
+        config,
         createdAt: diagram.created_at,
         updatedAt: diagram.updated_at
       });
 
       // Execute the flow
       const executionResult = await this.executor.execute(
-        diagram.blocks,
-        diagram.connections,
+        blocks,
+        connections,
         request.inputs
       );
 
@@ -61,8 +57,8 @@ export class ExecutionController {
       let testResults;
       if (request.testCases && request.testCases.length > 0) {
         testResults = await this.executor.runTests(
-          diagram.blocks,
-          diagram.connections,
+          blocks,
+          connections,
           request.testCases
         );
       }
@@ -70,23 +66,33 @@ export class ExecutionController {
       const executionTime = Date.now() - startTime;
 
       // Log execution
-      await supabase.from('execution_logs').insert({
-        diagram_id: request.diagramId,
-        user_id: userId,
-        status: executionResult.success ? 'success' : 'error',
-        inputs: request.inputs,
-        outputs: executionResult.outputs,
-        error: executionResult.error,
-        execution_time: executionTime
-      });
+      const logStmt = db.prepare(`
+        INSERT INTO execution_logs (id, diagram_id, user_id, status, inputs, outputs, error, execution_time)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      logStmt.run(
+        generateId(),
+        request.diagramId,
+        userId,
+        executionResult.success ? 'success' : 'error',
+        JSON.stringify(request.inputs),
+        executionResult.outputs ? JSON.stringify(executionResult.outputs) : null,
+        executionResult.error || null,
+        executionTime
+      );
 
       // Store generated code
-      await supabase.from('generated_code').insert({
-        diagram_id: request.diagramId,
-        language: 'javascript',
-        code: generatedCode.code,
-        orchestration_code: generatedCode.orchestrationCode
-      });
+      const codeStmt = db.prepare(`
+        INSERT INTO generated_code (id, diagram_id, language, code, orchestration_code)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      codeStmt.run(
+        generateId(),
+        request.diagramId,
+        'javascript',
+        generatedCode.code,
+        generatedCode.orchestrationCode || null
+      );
 
       return {
         success: executionResult.success,
@@ -109,14 +115,19 @@ export class ExecutionController {
       logger.error('Flow execution failed', { error: errorMessage });
 
       // Log failed execution
-      await supabase.from('execution_logs').insert({
-        diagram_id: request.diagramId,
-        user_id: userId,
-        status: 'error',
-        inputs: request.inputs,
-        error: errorMessage,
-        execution_time: executionTime
-      });
+      const logStmt = db.prepare(`
+        INSERT INTO execution_logs (id, diagram_id, user_id, status, inputs, error, execution_time)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      logStmt.run(
+        generateId(),
+        request.diagramId,
+        userId,
+        'error',
+        JSON.stringify(request.inputs),
+        errorMessage,
+        executionTime
+      );
 
       return {
         success: false,
@@ -127,15 +138,19 @@ export class ExecutionController {
   }
 
   async getExecutionLogs(diagramId: string, userId: string) {
-    const { data, error } = await supabase
-      .from('execution_logs')
-      .select('*')
-      .eq('diagram_id', diagramId)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    const logs = db
+      .prepare(`
+        SELECT * FROM execution_logs
+        WHERE diagram_id = ? AND user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 50
+      `)
+      .all(diagramId, userId) as any[];
 
-    if (error) throw error;
-    return data;
+    return logs.map(log => ({
+      ...log,
+      inputs: log.inputs ? JSON.parse(log.inputs) : null,
+      outputs: log.outputs ? JSON.parse(log.outputs) : null
+    }));
   }
 }

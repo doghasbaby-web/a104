@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { initializeDatabase } from './db/database.js';
+import authRoutes from './routes/auth.js';
 import diagramRoutes from './routes/diagrams.js';
 import executeRoutes from './routes/execute.js';
 import testRoutes from './routes/tests.js';
@@ -9,6 +11,10 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { logger } from './utils/logger.js';
 
 dotenv.config();
+
+// Initialize database
+initializeDatabase();
+logger.info('Database initialized');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -33,6 +39,7 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/diagrams', diagramRoutes);
 app.use('/api/execute', executeRoutes);
 app.use('/api/tests', testRoutes);

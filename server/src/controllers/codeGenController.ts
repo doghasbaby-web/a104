@@ -1,11 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import db, { generateId } from '../db/database';
 import type { GeneratedCode } from '../../../shared/types/index.js';
 import { CodeGenerator } from '../services/codeGenerator.js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export class CodeGenController {
   private codeGenerator: CodeGenerator;
@@ -20,16 +15,17 @@ export class CodeGenController {
     userId: string
   ): Promise<GeneratedCode> {
     // Get diagram
-    const { data: diagram, error } = await supabase
-      .from('diagrams')
-      .select('*')
-      .eq('id', diagramId)
-      .eq('user_id', userId)
-      .single();
+    const diagram = db
+      .prepare('SELECT * FROM diagrams WHERE id = ? AND user_id = ?')
+      .get(diagramId, userId) as any;
 
-    if (error || !diagram) {
+    if (!diagram) {
       throw new Error('Diagram not found');
     }
+
+    const blocks = JSON.parse(diagram.blocks || '[]');
+    const connections = JSON.parse(diagram.connections || '[]');
+    const config = diagram.config ? JSON.parse(diagram.config) : null;
 
     // Generate code
     const result = this.codeGenerator.generateFromDiagram({
@@ -37,24 +33,31 @@ export class CodeGenController {
       name: diagram.name,
       description: diagram.description,
       userId: diagram.user_id,
-      blocks: diagram.blocks || [],
-      connections: diagram.connections || [],
-      config: diagram.config,
+      blocks,
+      connections,
+      config,
       createdAt: diagram.created_at,
       updatedAt: diagram.updated_at
     }, language);
 
     // Store generated code
-    const { data: stored } = await supabase
-      .from('generated_code')
-      .insert({
-        diagram_id: diagramId,
-        language,
-        code: result.code,
-        orchestration_code: result.orchestrationCode
-      })
-      .select()
-      .single();
+    const stmt = db.prepare(`
+      INSERT INTO generated_code (id, diagram_id, language, code, orchestration_code)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    const id = generateId();
+    stmt.run(
+      id,
+      diagramId,
+      language,
+      result.code,
+      result.orchestrationCode || null
+    );
+
+    const stored = db
+      .prepare('SELECT created_at FROM generated_code WHERE id = ?')
+      .get(id) as any;
 
     return {
       diagramId,
@@ -67,24 +70,20 @@ export class CodeGenController {
 
   async getGeneratedCode(diagramId: string, userId: string) {
     // Verify ownership
-    const { data: diagram } = await supabase
-      .from('diagrams')
-      .select('id')
-      .eq('id', diagramId)
-      .eq('user_id', userId)
-      .single();
+    const diagram = db
+      .prepare('SELECT id FROM diagrams WHERE id = ? AND user_id = ?')
+      .get(diagramId, userId);
 
     if (!diagram) throw new Error('Diagram not found');
 
-    const { data, error } = await supabase
-      .from('generated_code')
-      .select('*')
-      .eq('diagram_id', diagramId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error;
+    const data = db
+      .prepare(`
+        SELECT * FROM generated_code
+        WHERE diagram_id = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `)
+      .get(diagramId) as any;
 
     if (!data) {
       return null;

@@ -1,10 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { verifyToken, getUserById } from '../utils/auth';
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -25,9 +20,13 @@ export const authenticate = async (
 
     const token = authHeader.substring(7);
 
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Verify JWT token
+    const decoded = verifyToken(token);
 
-    if (error || !user) {
+    // Get user from database
+    const user = getUserById(decoded.userId);
+
+    if (!user) {
       return res.status(401).json({ error: 'Invalid token' });
     }
 

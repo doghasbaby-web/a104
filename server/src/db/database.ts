@@ -180,6 +180,20 @@ export function initializeDatabase() {
     END;
   `);
 
+  // Create default 'king' user for development environment
+  const existingUser = db.prepare('SELECT id FROM users WHERE id = ?').get('king');
+  if (!existingUser) {
+    db.prepare(`
+      INSERT INTO users (id, email, password_hash)
+      VALUES (?, ?, ?)
+    `).run('king', 'king@dev.local', 'dev-only-no-password');
+
+    db.prepare(`
+      INSERT INTO profiles (id, email, full_name)
+      VALUES (?, ?, ?)
+    `).run('king', 'king@dev.local', 'King (Dev User)');
+  }
+
   console.log('Database initialized successfully');
 }
 

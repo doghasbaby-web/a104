@@ -14,8 +14,8 @@ A visual block-based programming environment for the BlockFlow language. Design 
 - **Split Panel Interface**:
   - **Left Panel**: Block diagram designer with library of reusable blocks
   - **Right Panel**: Generated code viewer and test execution results
-- **Authentication**: Secure user authentication via Supabase
-- **Persistent Storage**: Save and load diagrams from the cloud
+- **Local Storage**: Save and load diagrams from local SQLite database
+- **Persistent Data**: All data stored locally with no cloud dependencies
 - **Connection Types**: Support for sequential, parallel, conditional, loop, merge, and fork connections
 
 ## Tech Stack
@@ -32,14 +32,14 @@ A visual block-based programming environment for the BlockFlow language. Design 
 ### Backend
 - **Express** - API server
 - **TypeScript** - Type safety
-- **Supabase** - Database and authentication
+- **SQLite** - Local database
+- **better-sqlite3** - SQLite driver
 - **Zod** - Schema validation
 
 ## Prerequisites
 
 - Node.js >= 18.0.0
 - npm >= 9.0.0
-- A Supabase account and project
 
 ## Installation
 
@@ -58,14 +58,7 @@ npm install
 
 This will install dependencies for all workspaces (client, server, and shared).
 
-### 3. Set up Supabase
-
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Go to Project Settings > API to get your credentials
-3. Navigate to the SQL Editor in your Supabase dashboard
-4. Run the schema from `supabase/schema.sql` to create the database tables
-
-### 4. Configure environment variables
+### 3. Configure environment variables
 
 Create a `.env` file in the root directory:
 
@@ -73,26 +66,23 @@ Create a `.env` file in the root directory:
 cp .env.example .env
 ```
 
-Update the `.env` file with your Supabase credentials:
+Update the `.env` file with your configuration:
 
 ```env
-# Supabase Configuration
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-
 # Server Configuration
 PORT=3001
 NODE_ENV=development
 
-# Supabase Server Keys (for backend)
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+# Database Configuration
+DATABASE_PATH=./data/blockflow.db
 
 # CORS
 CORS_ORIGIN=http://localhost:5173
 ```
 
-### 5. Start the development servers
+The SQLite database will be automatically created at the specified path when you first start the server.
+
+### 4. Start the development servers
 
 ```bash
 npm run dev
@@ -110,7 +100,7 @@ npm run dev:server
 npm run dev:client
 ```
 
-### 6. Access the application
+### 5. Access the application
 
 Open your browser and navigate to:
 
@@ -122,7 +112,7 @@ http://localhost:5173
 
 ### Creating a New Diagram
 
-1. **Sign up / Log in** to your account
+1. Open the application in your browser
 2. Click **"New Diagram"** on the dashboard
 3. You'll be taken to the diagram editor
 
@@ -225,8 +215,8 @@ blockflow-builder/
 │   └── types/
 │       └── index.ts        # TypeScript types
 │
-├── supabase/
-│   └── schema.sql          # Database schema
+├── data/                   # SQLite database storage
+│   └── blockflow.db        # Local database file
 │
 └── package.json            # Root package.json
 ```
@@ -301,14 +291,15 @@ npm run type-check
 
 1. Build the client: `npm run build --workspace=client`
 2. Deploy the `client/dist` directory
-3. Set environment variables for Supabase
+3. Set environment variables as needed
 
 ### Backend (Railway/Render/Heroku)
 
 1. Build the server: `npm run build --workspace=server`
 2. Deploy the `server` directory
-3. Set environment variables
+3. Set environment variables (PORT, NODE_ENV, DATABASE_PATH, CORS_ORIGIN)
 4. Ensure the start script runs `node dist/index.js`
+5. Ensure the data directory is writable for SQLite database
 
 ## Contributing
 
@@ -332,11 +323,11 @@ PORT=3002
 server: { port: 5174 }
 ```
 
-### Supabase Connection Issues
+### Database Issues
 
-- Verify your Supabase URL and keys in `.env`
-- Check that RLS policies are properly set up
-- Ensure the database schema has been applied
+- Ensure the data directory exists and is writable
+- Check DATABASE_PATH in `.env` is correct
+- Verify SQLite database file permissions
 
 ### Module Resolution Errors
 
@@ -372,4 +363,4 @@ For issues and questions:
 
 ---
 
-Built with ❤️ using React, Express, and Supabase
+Built with ❤️ using React, Express, and SQLite

@@ -17,9 +17,33 @@ interface AuthResponse {
   session: Session;
 }
 
+// Check if we're in development mode
+const isDevelopment = import.meta.env.MODE === 'development' || import.meta.env.DEV;
+
+// Default 'king' user for development
+const DEV_USER: User = {
+  id: 'king',
+  email: 'king@dev.local',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+const DEV_SESSION: Session = {
+  access_token: 'dev-token-king',
+  user: DEV_USER,
+};
+
 class AuthClient {
   private session: Session | null = null;
   private listeners: ((session: Session | null) => void)[] = [];
+
+  constructor() {
+    // In development mode, automatically set the 'king' user session
+    if (isDevelopment) {
+      this.session = DEV_SESSION;
+      localStorage.setItem('session', JSON.stringify(DEV_SESSION));
+    }
+  }
 
   async signUp(email: string, password: string, metadata?: { fullName?: string }): Promise<AuthResponse> {
     const response = await fetch('http://localhost:3001/api/auth/signup', {

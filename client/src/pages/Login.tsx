@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
+const isDevelopment = import.meta.env.MODE === 'development' || import.meta.env.DEV;
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,6 +49,13 @@ export default function Login() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">BlockFlow Builder</h1>
           <p className="text-gray-600">Visual block-based programming environment</p>
+          {isDevelopment && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-sm text-yellow-800 font-medium">
+                Development Mode: Auto-logged in as 'king' user with all authorities
+              </p>
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleAuth} className="space-y-4">

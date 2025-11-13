@@ -12,6 +12,19 @@ export const authenticate = async (
   next: NextFunction
 ) => {
   try {
+    // In development environment, bypass authentication and use default 'king' user
+    if (process.env.NODE_ENV === 'development') {
+      req.userId = 'king';
+      req.user = {
+        id: 'king',
+        email: 'king@dev.local',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        authorities: ['*'], // All authorities
+      };
+      return next();
+    }
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

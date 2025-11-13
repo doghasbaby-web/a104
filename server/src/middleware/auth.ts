@@ -13,7 +13,9 @@ export const authenticate = async (
 ) => {
   try {
     // In development environment, bypass authentication and use default 'king' user
-    if (process.env.NODE_ENV === 'development') {
+    // Default to development if NODE_ENV is not set
+    const isDevelopment = !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+    if (isDevelopment) {
       req.userId = 'king';
       req.user = {
         id: 'king',

@@ -1,25 +1,32 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { supabase } from './lib/supabase';
-import { Session } from '@supabase/supabase-js';
+import { auth } from './lib/auth';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import DiagramEditor from './pages/DiagramEditor';
 import { Toaster } from './components/ui/toaster';
+
+interface Session {
+  access_token: string;
+  user: {
+    id: string;
+    email: string;
+  };
+}
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 

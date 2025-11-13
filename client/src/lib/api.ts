@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { supabase } from './supabase';
+import { auth } from './auth';
 
 const api = axios.create({
   baseURL: '/api',
@@ -10,7 +10,7 @@ const api = axios.create({
 
 // Add auth token to requests
 api.interceptors.request.use(async (config) => {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await auth.getSession();
 
   if (session?.access_token) {
     config.headers.Authorization = `Bearer ${session.access_token}`;
